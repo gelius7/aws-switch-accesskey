@@ -1,0 +1,61 @@
+#!/bin/bash
+
+ACCOUNT_PATH="${HOME}/.aws/accounts"
+
+##########################################
+### Functions
+##########################################
+help() {
+  cat <<EOF
+#### Avaiable list
+$(ls -1 ${ACCOUNT_PATH})
+
+EOF
+
+}
+
+read_file() {
+  FILE=${1}
+
+  REGION=$(jq -r '.REGION // "ap-northeast-2"' ${FILE})
+  OUTPUT=$(jq -r '.OUTPUT // "json"' ${FILE})
+  ACCESS_KEY=$(jq -r '.ACCESS_KEY' ${FILE})
+  SECRET_KEY=$(jq -r '.SECRET_KEY' ${FILE})
+}
+
+update_configuration() {
+  FILE_CONFIG="${HOME}/.aws/config"
+  FILE_CREDENTIALS="${HOME}/.aws/credentials"
+  echo "[default]" > ${FILE_CONFIG}
+  echo "region = ${REGION}" >> ${FILE_CONFIG}
+  echo "output = ${OUTPUT}" >> ${FILE_CONFIG}
+
+  echo "[default]" > ${FILE_CREDENTIALS}
+  echo "aws_access_key_id = ${ACCESS_KEY}" >> ${FILE_CREDENTIALS}
+  echo "aws_secret_access_key = ${SECRET_KEY}" >> ${FILE_CREDENTIALS}
+
+}
+
+##########################################
+### Main
+##########################################
+TITLE="Select AWS account"
+if [ $# -eq 0 ]; then
+  ACCOUNT=$(ls -1 ${ACCOUNT_PATH} | fzf --header="${TITLE}" --reverse --no-mouse --bind=left:page-up,right:page-down --height=10)
+elif [ $# -eq 1 ] && [ -f "${ACCOUNT_PATH}/$1" ]; then
+  ACCOUNT=$1
+else
+  help
+  exit 1
+fi
+
+echo "Account : ${ACCOUNT}"
+read_file ${ACCOUNT_PATH}/${ACCOUNT}
+
+### replace files ~/.aws/config, ~/.aws/credentials
+update_configuration
+
+### check aws access key
+aws configure list
+
+
