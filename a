@@ -21,6 +21,7 @@ read_file() {
   OUTPUT=$(jq -r '.OUTPUT // "json"' ${FILE})
   ACCESS_KEY=$(jq -r '.ACCESS_KEY' ${FILE})
   SECRET_KEY=$(jq -r '.SECRET_KEY' ${FILE})
+  SESSION_TOKEN=$(jq -r '.SESSION_TOKEN // ""' ${FILE})
 }
 
 update_configuration() {
@@ -33,6 +34,9 @@ update_configuration() {
   echo "[default]" > ${FILE_CREDENTIALS}
   echo "aws_access_key_id = ${ACCESS_KEY}" >> ${FILE_CREDENTIALS}
   echo "aws_secret_access_key = ${SECRET_KEY}" >> ${FILE_CREDENTIALS}
+  if [ ! -z ${SESSION_TOKEN} ]; then
+    echo "aws_session_token = ${SESSION_TOKEN}" >> ${FILE_CREDENTIALS}
+  fi
 
 }
 
