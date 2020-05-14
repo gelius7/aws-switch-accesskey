@@ -1,41 +1,92 @@
 #!/bin/bash
 
-ACCOUNT_PATH="${HOME}/.aws/accounts"
+ACCOUNT_LIST_PATH="${HOME}/.aws/accounts"
+ACCOUNT_LIST_FILE="${ACCOUNT_LIST_PATH}/list.json"
+SSO_LIST_FILE="${ACCOUNT_LIST_PATH}/sso-list.json"
+
+CONFIG_FILE="${HOME}/.aws/config"
+CREDENTIALS_FILE="${HOME}/.aws/credentials"
 
 ##########################################
 ### Functions
 ##########################################
 help() {
   cat <<EOF
+#### for SSO login
+$0 sso
+
 #### Avaiable list
-$(ls -1 ${ACCOUNT_PATH})
+$(cat ${ACCOUNT_LIST_FILE} | jq -r 'keys[]')
 
 EOF
 
 }
 
+get_account() {
+  FILE=${1}
+
+  ACCOUNT=$(cat ${FILE} | jq -r 'keys[]' | fzf --header="${TITLE}" --reverse --no-mouse --bind=left:page-up,right:page-down --height=10)  
+}
+
+reset() {
+
+  REGION="ap-northeast-2"
+  OUTPUT="json"
+  ACCESS_KEY=""
+  SECRET_KEY=""
+  SESSION_TOKEN=""
+
+  SSO_URL=""
+  SSO_REGION=""
+}
+
+# set_sso() {
+#   echo "sso_start_url=https://d-96671509b7.awsapps.com/start" >> ${CONFIG_FILE}
+#   echo "sso_region=ap-southeast-1" >> ${CONFIG_FILE}
+# }
+
 read_file() {
   FILE=${1}
 
-  REGION=$(jq -r '.REGION // "ap-northeast-2"' ${FILE})
-  OUTPUT=$(jq -r '.OUTPUT // "json"' ${FILE})
-  ACCESS_KEY=$(jq -r '.ACCESS_KEY' ${FILE})
-  SECRET_KEY=$(jq -r '.SECRET_KEY' ${FILE})
-  SESSION_TOKEN=$(jq -r '.SESSION_TOKEN // ""' ${FILE})
+  REGION=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].REGION // "ap-northeast-2"')
+  OUTPUT=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].OUTPUT // "json"')
+
+  ACCESS_KEY=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].ACCESS_KEY // ""')
+  SECRET_KEY=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].SECRET_KEY // ""')
+  SESSION_TOKEN=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].SESSION_TOKEN // ""')
+
+  SSO_URL=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].SSO_URL // ""')
+  SSO_REGION=$(cat ${FILE} | jq --arg ACNT ${ACCOUNT} -r '.[$ACNT].SSO_REGION // ""')
+
+  # echo "REGION : ${REGION}"
+  # echo "OUTPUT : ${OUTPUT}"
+  # echo "ACCESS_KEY : ${ACCESS_KEY}"
+  # echo "SECRET_KEY : ${SECRET_KEY}"
+  # echo "SSO_URL : ${SSO_URL}"
+  # echo "SSO_REGION : ${SSO_REGION}"
+
 }
 
 update_configuration() {
-  FILE_CONFIG="${HOME}/.aws/config"
-  FILE_CREDENTIALS="${HOME}/.aws/credentials"
-  echo "[default]" > ${FILE_CONFIG}
-  echo "region = ${REGION}" >> ${FILE_CONFIG}
-  echo "output = ${OUTPUT}" >> ${FILE_CONFIG}
+  echo "[default]" > ${CONFIG_FILE}
+  echo "region = ${REGION}" >> ${CONFIG_FILE}
+  echo "output = ${OUTPUT}" >> ${CONFIG_FILE}
 
-  echo "[default]" > ${FILE_CREDENTIALS}
-  echo "aws_access_key_id = ${ACCESS_KEY}" >> ${FILE_CREDENTIALS}
-  echo "aws_secret_access_key = ${SECRET_KEY}" >> ${FILE_CREDENTIALS}
+  if [ ! -z "${SSO_URL}" ]; then
+    echo "sso_start_url = ${SSO_URL}" >> ${CONFIG_FILE}
+  fi
+
+  if [ ! -z "${SSO_REGION}" ]; then
+    echo "sso_region = ${SSO_REGION}" >> ${CONFIG_FILE}
+  fi
+}
+
+update_credentials() {
+  echo "[default]" > ${CREDENTIALS_FILE}
+  echo "aws_access_key_id = ${ACCESS_KEY}" >> ${CREDENTIALS_FILE}
+  echo "aws_secret_access_key = ${SECRET_KEY}" >> ${CREDENTIALS_FILE}
   if [ ! -z ${SESSION_TOKEN} ]; then
-    echo "aws_session_token = ${SESSION_TOKEN}" >> ${FILE_CREDENTIALS}
+    echo "aws_session_token = ${SESSION_TOKEN}" >> ${CREDENTIALS_FILE}
   fi
 
 }
@@ -43,23 +94,72 @@ update_configuration() {
 ##########################################
 ### Main
 ##########################################
-TITLE="Select AWS account"
-if [ $# -eq 0 ]; then
-  ACCOUNT=$(ls -1 ${ACCOUNT_PATH} | fzf --header="${TITLE}" --reverse --no-mouse --bind=left:page-up,right:page-down --height=10)
-elif [ $# -eq 1 ] && [ -f "${ACCOUNT_PATH}/$1" ]; then
-  ACCOUNT=$1
-else
-  help
-  exit 1
-fi
 
-echo "Account : ${ACCOUNT}"
-read_file ${ACCOUNT_PATH}/${ACCOUNT}
 
-### replace files ~/.aws/config, ~/.aws/credentials
-update_configuration
 
-### check aws access key
-aws configure list
+_login_sso() {
+  get_account ${SSO_LIST_FILE}
+
+  # rm -rf ${HOME}/.aws/cli
+  # rm -rf ${HOME}/.aws/sso
+
+  reset
+
+  read_file ${SSO_LIST_FILE}
+  update_configuration
+
+  # set_sso
+
+  aws configure sso
+
+  aws s3 ls > /dev/null
+
+  PATH_SSO_CREDENTIALS="${HOME}/.aws/cli/cache/"
+  FILE_SSO_CREDENTIALS=$(ls ${PATH_SSO_CREDENTIALS} | head -n 1)
+  ACCESS_KEY=$(cat ${PATH_SSO_CREDENTIALS}/${FILE_SSO_CREDENTIALS} | jq -r '.Credentials.AccessKeyId')
+  SECRET_KEY=$(cat ${PATH_SSO_CREDENTIALS}/${FILE_SSO_CREDENTIALS} | jq -r '.Credentials.SecretAccessKey')
+  SESSION_TOKEN=$(cat ${PATH_SSO_CREDENTIALS}/${FILE_SSO_CREDENTIALS} | jq -r '.Credentials.SessionToken')
+
+  update_credentials
+}
+
+_login() {
+
+  if [ $# -eq 0 ]; then
+    get_account ${ACCOUNT_LIST_FILE}
+  # elif [ $# -eq 1 ] && [ -f "${ACCOUNT_LIST_PATH}/$1" ]; then
+  #   ACCOUNT=$1
+  else
+    help
+    exit 1
+  fi
+
+  echo "Account : ${ACCOUNT}"
+  read_file "${ACCOUNT_LIST_FILE}"
+
+  ### replace files ~/.aws/config, ~/.aws/credentials
+  update_configuration
+  update_credentials
+
+  ### check aws access key
+  aws configure list
+}
+
+_run() {
+
+  TITLE="Select AWS account"
+
+  if [ $# -eq 1 ] && [ "$1" = "sso" ]; then
+    _login_sso
+    exit 0
+  fi
+
+  _login
+  
+}
+
+
+_run $@
+
 
 
