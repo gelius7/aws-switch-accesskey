@@ -14,6 +14,7 @@ help() {
   cat <<EOF
 #### for SSO login
 $0 sso
+$0 sso -r (logout and login)
 
 #### Avaiable list
 $(cat ${ACCOUNT_LIST_FILE} | jq -r 'keys[]')
@@ -100,8 +101,12 @@ update_credentials() {
 _login_sso() {
   get_account ${SSO_LIST_FILE}
 
+  #### logout
+  if [ $# -ge 1 ] && [ "$1" = "-r" ]; then
   # rm -rf ${HOME}/.aws/cli
   # rm -rf ${HOME}/.aws/sso
+    aws sso logout
+  fi
 
   reset
 
@@ -110,11 +115,13 @@ _login_sso() {
 
   # set_sso
 
+  PATH_SSO_CREDENTIALS="${HOME}/.aws/cli/cache/"
+
   aws configure sso
+  rm -rf ${PATH_SSO_CREDENTIALS}*
 
   aws s3 ls > /dev/null
 
-  PATH_SSO_CREDENTIALS="${HOME}/.aws/cli/cache/"
   FILE_SSO_CREDENTIALS=$(ls ${PATH_SSO_CREDENTIALS} | head -n 1)
   ACCESS_KEY=$(cat ${PATH_SSO_CREDENTIALS}/${FILE_SSO_CREDENTIALS} | jq -r '.Credentials.AccessKeyId')
   SECRET_KEY=$(cat ${PATH_SSO_CREDENTIALS}/${FILE_SSO_CREDENTIALS} | jq -r '.Credentials.SecretAccessKey')
@@ -149,8 +156,12 @@ _run() {
 
   TITLE="Select AWS account"
 
-  if [ $# -eq 1 ] && [ "$1" = "sso" ]; then
-    _login_sso
+  if [ $# -ge 1 ] && [ "$1" = "sso" ]; then
+    if [ $# -ge 2 ] && [ "$2" = "-r" ]; then
+      _login_sso $2
+    else
+      _login_sso
+    fi
     exit 0
   fi
 
