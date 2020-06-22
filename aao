@@ -246,13 +246,10 @@ def login_all():
         cache_login = get_sso_cached_login(sso_profile)
         list_account = get_sso_account_list(sso_data[sso]["SSO_REGION"], cache_login)
 
-        print(f'{sso}')
         for acnt in list_account:
-            print(f'{acnt}')
             list_role = get_sso_role_list(sso_data[sso]["SSO_REGION"], cache_login, acnt["accountId"])
 
             for role in list_role:
-                print(f'{role}')
                 print(f'{sso_profile}')
                 sso_profile["sso_role_name"] = role["roleName"]
                 sso_profile["sso_account_id"] = role["accountId"]
@@ -275,8 +272,6 @@ def update_default_credential():
 
     profile_opts = config.items(f"{select}")
     profile = dict(profile_opts)
-
-    print(f'{profile}')
 
     profile_name = "default"
     region = profile.get("region", AWS_DEFAULT_REGION)
