@@ -243,7 +243,8 @@ def update_default_credential():
     config.set(profile_name, "region", region)
     config.set(profile_name, "aws_access_key_id", profile["aws_access_key_id"])
     config.set(profile_name, "aws_secret_access_key", profile["aws_secret_access_key"])
-    config.set(profile_name, "aws_session_token", profile["aws_session_token"])
+    if "aws_session_token" in profile:
+        config.set(profile_name, "aws_session_token", profile["aws_session_token"])
     write_config(AWS_CREDENTIAL_PATH, config)
 
 
