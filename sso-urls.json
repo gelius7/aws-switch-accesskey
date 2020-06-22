@@ -1,0 +1,28 @@
+{
+  "dev-sso": {
+    "SSO_URL": "https://sampledev.awsapps.com/start",
+    "SSO_REGION": "ap-southeast-1",
+    "SSO_ACCOUNT": [
+      {
+        "PROFILE": "master",
+        "ID": "123412341234",
+        "ROLE": "AdministratorAccess",
+        "REGION": "ap-northeast-2",
+        "OUTPUT": "json"
+      }
+    ]
+  },
+  "prod-sso": {
+    "SSO_URL": "https://sampleprod.awsapps.com/start",
+    "SSO_REGION": "ap-southeast-1",
+    "SSO_ACCOUNT": [
+      {
+        "PROFILE": "master",
+        "ID": "678967896789",
+        "ROLE": "AdministratorAccess",
+        "REGION": "ap-northeast-2",
+        "OUTPUT": "json"
+      }
+    ]
+  }
+}

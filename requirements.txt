@@ -1,0 +1,4 @@
+yq
+click
+boto3
+pyfzf
